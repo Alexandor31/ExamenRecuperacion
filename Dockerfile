@@ -1,5 +1,14 @@
+# Hugging Face Spaces — Docker SDK
+# https://huggingface.co/docs/hub/spaces-sdks-docker
+#
+# This Dockerfile is optimized for Hugging Face Spaces with Docker SDK:
+# - Builds the Chroma index at build time (HF provides 16 GB RAM, plenty)
+# - Pre-downloads all open-access PDFs
+# - Exposes port 7860 (HF expects this port)
+
 FROM python:3.11-slim
 
+# Environment: keep Python output unbuffered, telemetry off, CPU-only torch.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src \
@@ -8,37 +17,42 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TOKENIZERS_PARALLELISM=false \
     DATA_DIR=/app/data \
     CHROMA_DIR=/app/data/chroma \
-    AUTO_BUILD_INDEX=true \
     PORT=7860
 
 WORKDIR /app
 
+# System dependencies.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential curl git \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python deps first for better layer caching.
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+# Copy the rest of the project (PDFs come from the repo via git lfs).
 COPY . .
 
-# Pre-download the open-access PDFs at build time. This is fast (~30 s)
-# and ensures the corpus is in place for AUTO_BUILD_INDEX at startup.
-# Baeza-Yates is copyrighted and not downloaded; it can be uploaded to the
-# persistent volume later.
-RUN python scripts/download_corpus.py || true \
-    && ls -lh corpus/*.pdf corpus/articles/*.pdf 2>/dev/null || echo "no PDFs"
+# Pre-create dirs.
+RUN mkdir -p /app/data/chroma /app/corpus/articles
 
-# DO NOT build the Chroma index during Docker build. The build step has
-# limited memory/time on free tiers and the embedding pass over 3,584 chunks
-# can OOM. Instead, AUTO_BUILD_INDEX=true (set above + in fly.toml env) makes
-# the FastAPI lifespan build the index lazily on first startup, where the
-# process has the full 2 GB RAM and is not constrained by build timeouts.
+# --- Build-time setup --------------------------------------------------
+# 1. Download any missing open-access PDFs (Baeza-Yates is user-provided).
+# 2. Build the Chroma index so the service responds instantly on boot.
+#    HF Spaces provides ample RAM, so this completes in ~2-3 min.
+RUN python scripts/download_corpus.py || true \
+    && echo "--- PDFs in corpus ---" \
+    && (ls -lh corpus/*.pdf corpus/articles/*.pdf 2>/dev/null || echo "no PDFs") \
+    && echo "--- Building Chroma index ---" \
+    && python scripts/build_index.py \
+    && echo "--- Index ready ---"
 
 EXPOSE 7860
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl --fail http://localhost:${PORT:-7860}/health || exit 1
 
-CMD uvicorn ir_rag.api:app --host 0.0.0.0 --port ${PORT:-7860}
+# Default command for HF Spaces. Use the literal port 7860 — HF always routes
+# to this port regardless of $PORT, so we hardcode for clarity.
+CMD uvicorn ir_rag.api:app --host 0.0.0.0 --port 7860

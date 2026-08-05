@@ -157,4 +157,4 @@ Códigos esperados:
 | **Local + ngrok** | ✅ | ❌ (cambia) | Fácil | ⭐ Recomendado |
 | **HF Spaces Docker** | ✅ | ✅ | Media | Buena alternativa |
 | **Render** | ✅ | ✅ | Fácil | Buena alternativa |
-| **Fly.io** | ✅ con límites | ✅ | Media | ⚠️ Restricciones de RAM en free tier |
+| **Railway.app** | ✅ $5/mes crédito | ✅ | Fácil | Buena alternativa |

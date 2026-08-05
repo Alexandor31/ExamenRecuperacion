@@ -47,10 +47,10 @@ El proyecto incluye dos formas de arrancarlo, según dónde lo despliegues:
 
 | Entrada | Qué hace | Dónde usarlo |
 |---------|----------|--------------|
-| `uvicorn ir_rag.api:app` | Servicio FastAPI puro: `POST /answer`, `GET /health`, `GET /docs`. | Render.com / Fly.io / Railway / HF Docker (API real para el examen). |
+| `uvicorn ir_rag.api:app` | Servicio FastAPI puro: `POST /answer`, `GET /health`, `GET /docs`. | Local (con ngrok para HTTPS), Render.com, HF Spaces Docker, Railway. |
 | `streamlit run app.py` | UI Streamlit con pestañas de consulta, estado y documentación. | HF Spaces SDK Streamlit (solo para inspección visual). |
 
-⚠️ **Importante:** el SDK Streamlit de Hugging Face Spaces **no** expone endpoints HTTP personalizados. Si despliegas el proyecto en HF con SDK Streamlit, `POST /answer` **no será accesible públicamente** y el profesor no podrá evaluarlo con Postman. Para el examen, despliega la API FastAPI en Render.com (gratis).
+⚠️ **Importante:** el SDK Streamlit de Hugging Face Spaces **no** expone endpoints HTTP personalizados. Si despliegas el proyecto en HF con SDK Streamlit, `POST /answer` **no será accesible públicamente**. Usa SDK **Docker** en HF Spaces, o local + ngrok, para el examen.
 
 ---
 

@@ -4,7 +4,7 @@ IMPORTANTE: el SDK Streamlit de HF Spaces NO expone endpoints HTTP personalizado
 Por eso este archivo solo levanta la UI de Streamlit.
 
 Para tener `POST /answer` accesible públicamente al examen, despliega el mismo
-proyecto con Docker en Render.com / Fly.io / Railway. Ver docs/deployment_cheatsheet.md.
+proyecto con Docker en Render.com / Railway / HF Spaces. Ver docs/deployment_cheatsheet.md.
 """
 from __future__ import annotations
 

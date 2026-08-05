@@ -27,3 +27,6 @@ corpus/articles/*.pdf
 .DS_Store
 .idea/
 .vscode/
+
+# Virtual environment (no subir al repo, pesa mucho)
+.venv/

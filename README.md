@@ -2,6 +2,19 @@
 
 Servicio web (HTTPS) que responde preguntas sobre **Recuperación de Información** usando un pipeline RAG (*Retrieval-Augmented Generation*) construido a partir de los PDFs de la bibliografía del curso.
 
+## ⚡ Despliegue rápido (recomendado: local + ngrok)
+
+```bash
+# 1. Instalar ngrok y configurar token (https://dashboard.ngrok.com)
+# 2. Configurar el LLM:
+export LLM_API_KEY=gsk_tu_clave_groq
+
+# 3. Arrancar el servicio y ngrok con un solo comando:
+./start-local.sh
+```
+
+El script imprime la URL HTTPS pública (algo como `https://xxxx.ngrok-free.dev`) lista para Postman. Más detalles en [`docs/deployment_cheatsheet.md`](docs/deployment_cheatsheet.md).
+
 ## Tabla de contenidos
 
 1. [Visión general](#visión-general)
@@ -211,35 +224,46 @@ Los campos `semantic_score` (búsqueda densa inicial) y `rerank_score` (cross-en
 
 ## Despliegue
 
-### Hugging Face Spaces (opcional, solo para inspección visual)
+### Local + ngrok (RECOMENDADO, gratis)
 
-Si quieres inspeccionar el pipeline visualmente en HF Spaces:
+La opción más confiable. Ejecuta el servicio localmente y exponlo a Internet con un túnel HTTPS de ngrok.
 
-1. Crea un Space con SDK **Streamlit** y hardware **CPU basic** (gratis).
-2. Sube todos los archivos (incluido `app.py`), excluyendo `data/chroma/` y los PDFs.
-3. Define `LLM_API_KEY` como *secret* en **Settings → Variables and secrets**.
-4. La UI de Streamlit quedará visible en `https://<usuario>-<space>.hf.space`.
+**Setup único:**
 
-⚠️ Esta UI **no expone `POST /answer`** públicamente. Para la evaluación con Postman, despliega la API FastAPI en Render.com (ver abajo).
+```bash
+# 1. Instalar ngrok
+wget -q https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -O /tmp/ngrok.tgz
+tar -xzf /tmp/ngrok.tgz -C /tmp/ && mv /tmp/ngrok $HOME/.local/bin/ngrok
 
-### Render.com (RECOMENDADO para el examen, gratis con Docker)
+# 2. Crear cuenta en https://dashboard.ngrok.com y configurar token
+ngrok config add-authtoken <TU_TOKEN>
 
-1. Sube el proyecto a GitHub.
-2. En <https://render.com> → **New + → Web Service** → conecta el repo.
-3. **Environment**: Docker. **Plan**: Free. **Health Check Path**: `/health`.
-4. Define `LLM_API_KEY` en **Environment → Environment Variables**.
-5. Render detecta el `Dockerfile` y construye. La URL pública `https://<servicio>.onrender.com` expone `POST /answer` con HTTPS automático.
+# 3. Configurar el LLM
+export LLM_API_KEY=gsk_tu_clave_groq
+
+# 4. Arrancar todo con un solo comando
+./start-local.sh
+```
+
+El script imprime la URL HTTPS pública (algo como `https://xxxx.ngrok-free.dev`) lista para Postman.
 
 Más detalles en [`docs/deployment_cheatsheet.md`](docs/deployment_cheatsheet.md).
 
-### Render / Railway / Fly.io
+### Otras opciones de despliegue
 
-1. Conecta el repositorio.
-2. Comando de inicio: `uvicorn ir_rag.api:app --host 0.0.0.0 --port $PORT`.
-3. Define `LLM_API_KEY` como variable de entorno.
-4. Activa HTTPS automático de la plataforma.
+El proyecto incluye un `Dockerfile` listo para desplegar en:
 
-### Local
+| Plataforma | SDK | Notas |
+|---|---|---|
+| Hugging Face Spaces | Docker | CPU basic gratis. URL fija. |
+| Render.com | Docker | Free tier. URL fija. |
+| Railway.app | Docker | $5 USD/mes crédito (suficiente). URL fija. |
+
+> ⚠️ El SDK Streamlit de HF Spaces **no** expone endpoints HTTP personalizados, por lo que `POST /answer` **no** queda accesible públicamente. Si usas HF Spaces, usa SDK **Docker** (no Streamlit).
+
+### Solo local (sin túnel)
+
+Si quieres probar sin exponer a Internet:
 
 ```bash
 python -m venv .venv
@@ -247,23 +271,17 @@ source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env   # rellena LLM_API_KEY
 
-python scripts/download_corpus.py   # descarga lo público
+python scripts/download_corpus.py
 # Coloca tu PDF de Baeza-Yates en corpus/baeza-yates-modern-ir.pdf
 
 PYTHONPATH=./src python scripts/build_index.py --reset
 
-# Opción A — FastAPI puro (Render / Docker / local)
+# API FastAPI
 PYTHONPATH=./src uvicorn ir_rag.api:app --host 0.0.0.0 --port 7860
 
-# Opción B — UI Streamlit (HF Spaces SDK Streamlit / local)
+# O UI Streamlit (solo para inspección)
 PYTHONPATH=./src streamlit run app.py --server.port 7860
 ```
-
-### Túnel público temporal (sin desplegar)
-
-```bash
-# ngrok
-ngrok http 7860
 
 # Cloudflare Tunnel
 cloudflared tunnel --url http://localhost:7860

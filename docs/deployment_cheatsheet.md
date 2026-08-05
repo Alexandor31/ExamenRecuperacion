@@ -1,106 +1,122 @@
 # Despliegue — cheatsheet
 
-El proyecto tiene **dos puntos de entrada** según dónde lo despliegues:
-
-| Archivo | Qué hace | Cuándo usarlo |
-|---------|----------|---------------|
-| `ir_rag/api.py` (vía `uvicorn ir_rag.api:app`) | Servicio FastAPI puro: expone `POST /answer`, `GET /health`, `GET /docs`, etc. | **Render / Fly.io / Railway / HF Docker** — este es el que usa el examen con Postman. |
-| `app.py` (vía `streamlit run app.py`) | UI Streamlit que permite probar el pipeline localmente y ver el estado. | **HF Spaces SDK Streamlit** — solo para inspección visual. |
-
-## ⚠️ Por qué dos puntos de entrada
-
-El SDK Streamlit de Hugging Face Spaces **no** permite montar endpoints HTTP personalizados. Si despliegas el proyecto en HF Spaces con SDK Streamlit, `POST /answer` **no será accesible públicamente**, por lo que el profesor no podrá evaluarlo con Postman.
-
-Por eso:
-
-- **Streamlit** = UI opcional para inspección manual.
-- **FastAPI** = el servicio real que responde al examen.
-
-Recomendación: despliega la API FastAPI en **Render.com** (gratis con Docker) y, opcionalmente, despliega la UI Streamlit en **Hugging Face Spaces** (también gratis).
+El proyecto está pensado para correr **localmente con `uvicorn`** y exponerse a Internet con **ngrok** (gratis). Esa es la opción recomendada y más confiable. El `Dockerfile` se incluye por si más adelante quieres desplegarlo en otra plataforma (Hugging Face Spaces, Render, etc.).
 
 ---
 
-## Opción 1 — Render.com (RECOMENDADA para el examen, gratis con Docker)
+## Opción 1 — Local + ngrok (RECOMENDADA, gratis)
 
-1. Sube el proyecto a GitHub (`corpus/*.pdf` y `data/chroma/` se ignoran con `.gitignore`).
-2. Ve a <https://render.com> → **New + → Web Service** → conecta el repo.
-3. Configuración:
-   - **Environment**: Docker
-   - **Region**: cualquiera cercana
-   - **Plan**: **Free** (750 h/mes, suficiente)
-   - **Health Check Path**: `/health`
-4. **Environment → Environment Variables**:
-   - `LLM_API_KEY` = tu clave Groq (u otro)
-   - Opcional: `LLM_MODEL`, `LLM_API_BASE`
-   - Opcional: `AUTO_BUILD_INDEX=true` para construir el índice en cada arranque (lento, 3-4 min)
-5. Pulsa **Create Web Service**. Render detecta el `Dockerfile` y construye.
-6. Una vez en línea, la URL será `https://<servicio>.onrender.com` con HTTPS automático.
-
-Verifica:
+### 1.1 Instalar ngrok (solo una vez)
 
 ```bash
-curl https://<servicio>.onrender.com/health
-curl -X POST https://<servicio>.onrender.com/answer \
-     -H 'Content-Type: application/json' \
-     -d '{"question": "## ¿Qué es BM25?"}'
+# Linux x86_64 / WSL:
+wget -q https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -O /tmp/ngrok.tgz
+tar -xzf /tmp/ngrok.tgz -C /tmp/
+mv /tmp/ngrok $HOME/.local/bin/ngrok
 ```
 
-Pega esta URL en la celda H del notebook `examen_supletorio_rag.ipynb`.
+### 1.2 Crear cuenta y configurar token
 
----
-
-## Opción 2 — Fly.io (gratis con Docker)
-
-1. Instala flyctl: <https://fly.io/docs/hands-on/install-flyctl/>
-2. `fly launch` en el directorio del proyecto.
-3. Edita el `fly.toml` generado:
-   ```toml
-   [env]
-     LLM_API_KEY = "tu-clave-groq"
-     AUTO_BUILD_INDEX = "true"
-
-   [[services]]
-     internal_port = 7860
-     protocol = "tcp"
-     [[services.ports]]
-       port = 443
-       handlers = ["tls", "http"]
-   ```
-4. `fly deploy`.
-5. URL pública: `https://<app>.fly.dev`.
-
----
-
-## Opción 3 — Hugging Face Spaces con SDK Streamlit (gratis, solo UI)
-
-Si aún quieres usar HF Spaces para tener la UI de inspección:
-
-1. Crea un Space con SDK **Streamlit** y hardware **CPU basic** (gratis).
-2. Sube los archivos del proyecto, **incluyendo `app.py`** y excluyendo `data/chroma/` y los PDFs pesados.
-3. En **Settings → Variables and secrets** define `LLM_API_KEY` como *secret*.
-4. La UI de Streamlit quedará accesible en `https://<usuario>-<space>.hf.space` pero `POST /answer` NO estará disponible públicamente. Usa este Space solo para inspección visual; despliega la API en Render para el examen.
-
----
-
-## Opción 4 — Local + ngrok (sin despliegue en la nube)
-
-Si no quieres desplegar en ninguna plataforma:
+1. <https://dashboard.ngrok.com/signup> (gratis, con Google).
+2. <https://dashboard.ngrok.com/get-started/your-authtoken> → copia el token.
+3. Configura ngrok:
 
 ```bash
-# Terminal 1: arranca el servicio FastAPI
-PYTHONPATH=./src python3 -m uvicorn ir_rag.api:app --host 0.0.0.0 --port 7860
+ngrok config add-authtoken <TU_TOKEN>
+```
 
-# Terminal 2: expone el puerto a Internet
+### 1.3 Configurar el LLM
+
+```bash
+# Opción A — variable de entorno:
+export LLM_API_KEY=gsk_tu_clave_groq
+
+# Opción B — archivo .env:
+echo "LLM_API_KEY=gsk_tu_clave_groq" > .env
+```
+
+Consigue la clave Groq gratis en <https://console.groq.com/keys>.
+
+### 1.4 Arrancar todo con el script
+
+```bash
+./start-local.sh
+```
+
+Verás algo como:
+
+```
+🚀 Arrancando el servicio en el puerto 7860...
+✅ Servicio listo
+   Health check: {"status":"ok","chunks":3584,...}
+
+🌐 Lanzando ngrok en el puerto 7860...
+
+============================================================
+🎉 Tu servicio está disponible públicamente en:
+   https://a1b2-c3d4-e5f6.ngrok-free.app
+
+📋 Para usar con Postman:
+   POST  https://a1b2-c3d4-e5f6.ngrok-free.app/answer
+   Body: {"question": "## ¿Qué es BM25?"}
+============================================================
+```
+
+> **Importante**: la URL de ngrok cambia cada vez que reinicies ngrok. Mantén la terminal abierta mientras uses el servicio.
+
+### 1.5 Arrancar manualmente (sin script)
+
+Si prefieres control granular:
+
+```bash
+# Terminal 1 — el servicio
+DATA_DIR=./data CHROMA_DIR=./data/chroma CHROMA_COLLECTION=ir_corpus \
+  PYTHONPATH=./src \
+  python3 -m uvicorn ir_rag.api:app --host 0.0.0.0 --port 7860
+
+# Terminal 2 — ngrok
 ngrok http 7860
 ```
 
-ngrok te dará una URL `https://<id>.ngrok-free.app` que puedes usar con Postman. **Limitación**: la URL cambia cada vez que reinicies ngrok (a menos que uses el plan de pago).
+---
 
-Alternativa gratuita con URL fija: [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/):
+## Opción 2 — Hugging Face Spaces con SDK Docker (gratis)
+
+Si prefieres una URL fija y no depender de tu máquina local, HF Spaces Docker SDK es gratis (CPU basic).
+
+### Pasos resumidos
+
+1. <https://huggingface.co/new-space> → SDK: **Docker** → CPU basic.
+2. Clona el Space y sube el código (sin `data/chroma/`, sin PDFs pesados):
 
 ```bash
-cloudflared tunnel --url http://localhost:7860
+git clone https://huggingface.co/spaces/<usuario>/<space>
+cd <space>
+rsync -av --exclude='data/chroma/' --exclude='data/index_manifest.json' \
+   --exclude='.venv/' --exclude='__pycache__/' --exclude='.git/' \
+   /ruta/al/proyecto/ .
+git lfs install
+git lfs track "*.pdf"
+git add .
+git commit -m "Deploy"
+git push
 ```
+
+3. Settings → Secrets → añade `LLM_API_KEY`.
+
+4. URL pública: `https://<usuario>-<space>.hf.space`.
+
+> Limitación: el plan CPU basic tiene 16 GB RAM y 2 vCPU gratis, suficiente para este proyecto.
+
+---
+
+## Opción 3 — Render.com (gratis con Docker)
+
+1. Sube el proyecto a GitHub.
+2. <https://render.com> → New + → Web Service → conecta el repo.
+3. Environment: **Docker**. Plan: **Free**. Health Check Path: `/health`.
+4. Environment → Environment Variables → añade `LLM_API_KEY`.
+5. URL: `https://<servicio>.onrender.com`.
 
 ---
 
@@ -109,16 +125,16 @@ cloudflared tunnel --url http://localhost:7860
 ```bash
 HOST=https://<tu-host>
 
-# Health check (debe devolver 200)
+# Health check
 curl $HOST/health
 
-# Pregunta válida (necesita LLM_API_KEY)
+# Pregunta válida
 curl -X POST $HOST/answer \
      -H 'Content-Type: application/json' \
      -d '{"question": "## ¿Qué es BM25?"}'
 
-# Documentación interactiva (abre en el navegador)
-open $HOST/docs
+# Documentación interactiva
+# Abrir en el navegador: $HOST/docs
 ```
 
 Códigos esperados:
@@ -131,3 +147,14 @@ Códigos esperados:
 | 422 | Markdown sin pregunta extraíble. |
 | 500 | Error inesperado del servidor. |
 | 503 | Falta `LLM_API_KEY` o el índice está vacío. |
+
+---
+
+## 🎯 Resumen rápido
+
+| Plataforma | Gratis | URL fija | Dificultad | Veredicto |
+|---|---|---|---|---|
+| **Local + ngrok** | ✅ | ❌ (cambia) | Fácil | ⭐ Recomendado |
+| **HF Spaces Docker** | ✅ | ✅ | Media | Buena alternativa |
+| **Render** | ✅ | ✅ | Fácil | Buena alternativa |
+| **Fly.io** | ✅ con límites | ✅ | Media | ⚠️ Restricciones de RAM en free tier |

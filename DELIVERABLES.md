@@ -1,17 +1,13 @@
 # Entrega del Examen de Recuperación — Servicio RAG
 
 > **ICCD753 Recuperación de Información 2026-A · Prof. Iván Carrera · EPN-FIS**
->
-> Estudiante: *(colocar nombre)*
->
-> Fecha: 2026-08-05
 
 ---
 
 ## a. URL base del servicio
 
 ```
-https://prone-snowiness-reviving.ngrok-free.dev
+https://examenrecuperacion-production-9871.up.railway.app/docs
 ```
 
 Esta URL se sirve mediante **ngrok** (HTTPS automático) apuntando al servicio FastAPI corriendo localmente. Mientras la máquina que ejecuta `start-local.sh` esté encendida, la URL responde 24/7.
@@ -19,8 +15,8 @@ Esta URL se sirve mediante **ngrok** (HTTPS automático) apuntando al servicio F
 ### Verificación rápida
 
 ```bash
-curl https://prone-snowiness-reviving.ngrok-free.dev/
-curl https://prone-snowiness-reviving.ngrok-free.dev/health
+curl https://examenrecuperacion-production-9871.up.railway.app/
+curl https://examenrecuperacion-production-9871.up.railway.app/health
 ```
 
 ---

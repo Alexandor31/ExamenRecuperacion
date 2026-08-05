@@ -1,0 +1,78 @@
+# Fly.io configuration for the IR RAG service.
+# Docs: https://fly.io/docs/reference/configuration/
+
+app = "examenrecuperacion"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Pipeline settings
+  DATA_DIR = "/app/data"
+  CHROMA_DIR = "/app/data/chroma"
+  CHROMA_COLLECTION = "ir_corpus"
+  AUTO_BUILD_INDEX = "true"
+
+  # IMPORTANT: pin the PORT so the Dockerfile CMD expands consistently.
+  # internal_port below must match.
+  PORT = "7860"
+
+  # Model config (CPU-only)
+  EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+  RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  LLM_MODEL = "llama-3.3-70b-versatile"
+  LLM_API_BASE = "https://api.groq.com/openai/v1"
+
+  # Python niceness
+  PYTHONUNBUFFERED = "1"
+  PYTHONDONTWRITEBYTECODE = "1"
+  HF_HUB_DISABLE_TELEMETRY = "1"
+  TOKENIZERS_PARALLELISM = "false"
+
+# Memory: 2 GB so the embedding + cross-encoder + Chroma index fit comfortably.
+# Free tier gives you up to 3 shared-cpu-1x VMs; this uses one with 2 GB.
+[vm]
+  size = "shared-cpu-1x"
+  memory = "2gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+# Service: route external HTTPS traffic to internal port 7860.
+[[services]]
+  protocol = "tcp"
+  internal_port = 7860
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1        # keep 1 warm so cold start is fast
+  processes = ["app"]
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+  # Health check — Fly pings this to know if the app is alive.
+  # grace_period gives time for the index build at startup.
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "180s"
+    restart_limit = 5
+    path = "/health"
+    protocol = "http"
+
+# Mount a small persistent volume so the index survives restarts.
+# Free tier includes 3 GB of volume storage.
+[mounts]
+  source = "ir_data"
+  destination = "/app/data"

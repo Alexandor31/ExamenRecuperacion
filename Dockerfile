@@ -1,23 +1,22 @@
 FROM python:3.11-slim
 
 # Prevent Python from writing .pyc files and buffering stdout/stderr.
-# Render.com sets $PORT automatically; default to 7860 for HF Spaces / local.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src \
-    PORT=7860 \
-    DATA_DIR=/app/data \
-    CHROMA_DIR=/app/data/chroma \
-    AUTO_BUILD_INDEX=false \
     HF_HUB_DISABLE_TELEMETRY=1 \
     TRANSFORMERS_VERBOSITY=error \
-    TOKENIZERS_PARALLELISM=false
+    TOKENIZERS_PARALLELISM=false \
+    DATA_DIR=/app/data \
+    CHROMA_DIR=/app/data/chroma \
+    AUTO_BUILD_INDEX=true \
+    PORT=7860
 
 WORKDIR /app
 
-# System dependencies (curl for HEALTHCHECK).
+# System dependencies.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential curl \
+    && apt-get install -y --no-install-recommends build-essential curl git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps first for better layer caching.
@@ -28,28 +27,22 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy the rest of the project.
 COPY . .
 
-# Pre-create persistent data dirs.
-RUN mkdir -p /app/data/chroma /app/corpus/articles
+# Create data dirs (the actual volume is mounted at /app/data at runtime).
+RUN mkdir -p /app/data/chroma /app/corpus/articles /root/.cache/huggingface
 
 # --- Build-time setup --------------------------------------------------
-# Step 1: download the open-access PDFs into the image (skip if already there).
+# Step 1: download the open-access PDFs (skip if already in the image).
 # Step 2: build the Chroma index so the service responds instantly on boot.
-#         Baeza-Yates is copyrighted and NOT downloaded; if it's not present
-#         in the repo, the registry entry simply contributes zero chunks.
+#         CPU-only torch makes this take ~2 min instead of ~5.
 RUN python scripts/download_corpus.py || true \
     && echo "--- PDFs in corpus ---" \
-    && ls -lh corpus/*.pdf corpus/articles/*.pdf 2>/dev/null || true \
-    && echo "--- Building Chroma index ---" \
+    && (ls -lh corpus/*.pdf corpus/articles/*.pdf 2>/dev/null || echo "no PDFs yet") \
+    && echo "--- Building Chroma index (CPU-only) ---" \
     && python scripts/build_index.py \
-    && echo "--- Index built ---" \
-    && ls -lh data/chroma/ 2>/dev/null || true
+    && echo "--- Index built ---"
 
-# HF Spaces / Render expose this port.
+# Fly / Render / HF Spaces expose this port.
 EXPOSE 7860
 
-# Liveness probe.
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
-    CMD curl --fail http://localhost:${PORT}/health || exit 1
-
-# Use a shell wrapper so we read $PORT at runtime (Render sets it dynamically).
-CMD ["sh", "-c", "uvicorn ir_rag.api:app --host 0.0.0.0 --port ${PORT:-7860}"]
+# Shell-form CMD: $PORT is set by Fly.toml (7860). Falls back to 7860 otherwise.
+CMD uvicorn ir_rag.api:app --host 0.0.0.0 --port ${PORT:-7860}

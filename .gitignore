@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Data and index artefacts
+data/chroma/
+data/index_manifest.json
+corpus/*.pdf
+corpus/articles/*.pdf
+!corpus/.gitkeep
+!corpus/articles/.gitkeep
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Environment / secrets
+.env
+.streamlit/secrets.toml
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

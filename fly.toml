@@ -62,11 +62,12 @@ primary_region = "iad"
     soft_limit = 20
 
   # Health check — Fly pings this to know if the app is alive.
-  # grace_period gives time for the index build at startup.
+  # grace_period gives time for the first-startup index build
+  # (PDF extraction + embedding 3,584 chunks can take ~4 min on CPU).
   [[services.http_checks]]
     interval = "30s"
     timeout = "10s"
-    grace_period = "180s"
+    grace_period = "600s"
     restart_limit = 5
     path = "/health"
     protocol = "http"

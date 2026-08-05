@@ -1,0 +1,37 @@
+# Files we don't need inside the Docker image.
+.git/
+.github/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Tests and notebooks (not needed at runtime)
+.ipynb_checkpoints/
+*.ipynb
+
+# Documentation source
+docs/
+
+# Data we will rebuild at build time
+data/chroma/
+data/index_manifest.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Logs / env
+*.log
+.env
+.streamlit/
+
+# Local-only stuff
+.cache/
+.mypy_cache/

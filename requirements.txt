@@ -8,6 +8,10 @@ streamlit>=1.40,<2
 chromadb>=1.0,<2
 sentence-transformers>=3.3,<6
 numpy>=1.26,<3
+
+# CPU-only PyTorch (saves ~2.5 GB and 2-3 min vs the default CUDA build).
+# Render free tier is CPU-only; we never use the GPU here.
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch>=2.2,<3
 
 # PDF processing
